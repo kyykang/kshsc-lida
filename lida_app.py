@@ -45,15 +45,26 @@ with tab1:
     st.header("📁 上传数据文件")
     
     uploaded_file = st.file_uploader(
-        "选择CSV文件",
-        type=["csv"],
-        help="请上传CSV格式的数据文件"
+        "选择数据文件",
+        type=["csv", "xlsx", "xls"],
+        help="请上传CSV或Excel格式的数据文件"
     )
     
     if uploaded_file is not None:
         try:
-            # 读取数据
-            df = pd.read_csv(uploaded_file)
+            # 根据文件扩展名选择读取方式
+            file_extension = uploaded_file.name.split('.')[-1].lower()
+            
+            if file_extension == 'csv':
+                # 读取CSV文件
+                df = pd.read_csv(uploaded_file)
+            elif file_extension in ['xlsx', 'xls']:
+                # 读取Excel文件
+                df = pd.read_excel(uploaded_file, engine='openpyxl' if file_extension == 'xlsx' else None)
+            else:
+                st.error("❌ 不支持的文件格式")
+                st.stop()
+            
             st.success(f"✅ 文件上传成功！数据形状: {df.shape}")
             
             # 显示数据预览
@@ -66,6 +77,7 @@ with tab1:
             
         except Exception as e:
             st.error(f"❌ 文件读取失败: {e}")
+            st.info("💡 提示：如果是Excel文件，请确保文件格式正确且没有密码保护")
 
 with tab2:
     st.header("📊 数据摘要")
