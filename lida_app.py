@@ -114,6 +114,21 @@ if selected_tab_name == "📁 数据上传":
             st.session_state.data = df
             st.session_state.filename = uploaded_file.name
             
+            # 同时保存文件到lida/web/files/data目录，供LIDA库使用
+            import os
+            data_folder = os.path.join(os.path.dirname(__file__), "lida/web/files/data")
+            os.makedirs(data_folder, exist_ok=True)
+            file_path = os.path.join(data_folder, uploaded_file.name)
+            
+            # 根据文件类型保存
+            if file_extension == 'csv':
+                df.to_csv(file_path, index=False, encoding='utf-8')
+            else:  # Excel文件转换为CSV保存
+                csv_filename = uploaded_file.name.rsplit('.', 1)[0] + '.csv'
+                csv_path = os.path.join(data_folder, csv_filename)
+                df.to_csv(csv_path, index=False, encoding='utf-8')
+                st.session_state.filename = csv_filename  # 更新文件名为CSV格式
+            
         except Exception as e:
             st.error(f"❌ 文件读取失败: {e}")
             st.info("💡 提示：如果是Excel文件，请确保文件格式正确且没有密码保护")
@@ -434,20 +449,23 @@ elif selected_tab_name == "✏️ 图表编辑":
                     # 获取LIDA管理器
                     lida = get_lida_manager()
                     
+                    # 设置数据到管理器中 - 这是关键修复
+                    lida.data = st.session_state.data
+                    
                     # 导入配置类
                     from lida.datamodel import TextGenerationConfig
                     
                     # 将指令分割成列表
                     instructions_list = [inst.strip() for inst in edit_instructions.split('\n') if inst.strip()]
                     
-                    # 编辑图表
+                    # 编辑图表 - 添加data参数和return_error参数以获得更好的错误处理
                     edited_charts = lida.edit(
                         code=current_chart.code,
                         summary=st.session_state.summary,
                         instructions=instructions_list,
                         library="matplotlib",
                         textgen_config=TextGenerationConfig(n=1, temperature=0),
-                        data=st.session_state.data
+                        return_error=True
                     )
                     
                     if edited_charts:
