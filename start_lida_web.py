@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-LIDA Web界面启动脚本
-使用你配置好的自定义LLM服务
-
-这个脚本会启动LIDA的Web界面，你可以通过浏览器访问来进行数据可视化
+LIDA Web应用启动器
+使用自定义LLM服务的Streamlit应用
 """
 
+import streamlit as st
+import pandas as pd
 import sys
 import os
 from pathlib import Path
@@ -16,48 +16,45 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 def start_lida_web():
     """
-    启动LIDA Web界面
-    使用自定义LLM配置
+    启动LIDA Web应用
     """
+    print("🚀 正在启动LIDA Web应用...")
+    
     try:
-        # 导入必要的模块
-        from custom_llm_config_working import get_lida_manager
-        import streamlit as st
-        
-        print("🚀 正在启动LIDA Web界面...")
-        print("📍 使用自定义LLM服务: http://10.254.28.17:30000")
-        
-        # 获取配置好的LIDA管理器
-        lida = get_lida_manager()
-        
-        print("✅ LIDA管理器初始化成功！")
-        print("🌐 正在启动Web服务器...")
-        print("\n📝 启动后请在浏览器中访问显示的地址")
-        print("💡 通常是: http://localhost:8501")
-        print("\n⚠️  要停止服务器，请按 Ctrl+C")
-        
-        # 启动Streamlit应用
-        # 这里需要创建一个简单的Streamlit应用
+        # 创建Streamlit应用文件
         create_streamlit_app()
         
-        # 运行Streamlit
-        os.system("streamlit run lida_app.py --server.port 8501")
+        # 启动Streamlit服务
+        import subprocess
         
-    except ImportError as e:
-        print(f"❌ 导入模块失败: {e}")
-        print("\n可能需要安装Streamlit:")
-        print("python3 -m pip install streamlit")
-        return False
+        # 设置环境变量
+        env = os.environ.copy()
+        env['STREAMLIT_SERVER_HEADLESS'] = 'true'
         
+        # 启动命令
+        cmd = [
+            sys.executable, '-m', 'streamlit', 'run', 
+            'temp_lida_app.py', 
+            '--server.port', '8501',
+            '--server.address', '0.0.0.0'
+        ]
+        
+        print("📊 启动Streamlit服务...")
+        print(f"🌐 访问地址: http://localhost:8501")
+        
+        # 启动服务
+        subprocess.run(cmd, env=env)
+        
+    except KeyboardInterrupt:
+        print("\n👋 服务已停止")
     except Exception as e:
         print(f"❌ 启动失败: {e}")
-        return False
 
 def create_streamlit_app():
     """
     创建一个简单的Streamlit应用文件
     """
-    app_content = '''import streamlit as st
+    app_content = """import streamlit as st
 import pandas as pd
 import sys
 from pathlib import Path
@@ -89,159 +86,157 @@ with st.sidebar:
     
     st.header("📝 使用说明")
     st.markdown(
-        """
+        '''
         1. 上传CSV数据文件
         2. 查看数据摘要
         3. 生成可视化图表
         4. 下载结果
-        """
+        '''
     )
 
 # 主要内容区域
 tab1, tab2, tab3 = st.tabs(["📁 数据上传", "📊 数据摘要", "📈 可视化"])
 
 with tab1:
-    st.header("📁 上传数据文件")
+    st.header("📁 数据上传")
     
     uploaded_file = st.file_uploader(
         "选择CSV文件",
-        type=["csv"],
-        help="请上传CSV格式的数据文件"
+        type=['csv'],
+        help="上传您的数据文件进行分析"
     )
     
     if uploaded_file is not None:
-        try:
-            # 读取数据
-            df = pd.read_csv(uploaded_file)
-            st.success(f"✅ 文件上传成功！数据形状: {df.shape}")
-            
-            # 显示数据预览
-            st.subheader("📋 数据预览")
-            st.dataframe(df.head(10))
-            
-            # 保存到session state
-            st.session_state.data = df
-            st.session_state.filename = uploaded_file.name
-            
-        except Exception as e:
-            st.error(f"❌ 文件读取失败: {e}")
+        # 读取并显示数据
+        df = pd.read_csv(uploaded_file)
+        st.success(f"✅ 成功上传文件: {uploaded_file.name}")
+        
+        # 数据预览
+        st.subheader("📋 数据预览")
+        st.dataframe(df.head(), use_container_width=True)
+        
+        # 数据基本信息
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("数据行数", len(df))
+        with col2:
+            st.metric("数据列数", len(df.columns))
+        with col3:
+            st.metric("数据大小", f"{df.memory_usage(deep=True).sum() / 1024:.1f} KB")
+        
+        # 存储数据到session state
+        st.session_state['uploaded_data'] = df
 
 with tab2:
     st.header("📊 数据摘要")
     
-    if 'data' in st.session_state:
+    if 'uploaded_data' in st.session_state:
+        df = st.session_state['uploaded_data']
+        
         if st.button("🔍 生成数据摘要", type="primary"):
-            try:
-                with st.spinner("正在分析数据..."):
+            with st.spinner("正在分析数据..."):
+                try:
                     # 获取LIDA管理器
-                    lida = get_lida_manager()
+                    lida_manager = get_lida_manager()
                     
-                    # 生成摘要
-                    summary = lida.summarize(st.session_state.data)
-                    
-                    st.success("✅ 数据摘要生成成功！")
-                    
-                    # 显示摘要信息
-                    st.subheader("📋 数据集信息")
-                    st.write(f"**文件名:** {st.session_state.filename}")
-                    st.write(f"**数据形状:** {summary.shape}")
-                    st.write(f"**列数:** {len(summary.columns)}")
-                    
-                    # 显示列信息
-                    st.subheader("📊 列信息")
-                    for col in summary.columns:
-                        st.write(f"- **{col.column_name}** ({col.column_type}): {col.column_description}")
-                    
-                    # 保存摘要到session state
-                    st.session_state.summary = summary
-                    
-            except Exception as e:
-                st.error(f"❌ 摘要生成失败: {e}")
+                    if lida_manager:
+                        # 将DataFrame转换为字符串格式
+                        data_str = df.to_csv(index=False)
+                        
+                        # 生成数据摘要
+                        summary = lida_manager.summarize(data_str, summary_method="default")
+                        
+                        if summary:
+                            st.success("✅ 数据摘要生成成功")
+                            
+                            # 显示摘要信息
+                            st.subheader("📈 数据集概览")
+                            if hasattr(summary, 'dataset_description') and summary.dataset_description:
+                                st.write(f"**数据描述**: {summary.dataset_description}")
+                            
+                            # 字段信息
+                            if hasattr(summary, 'fields') and summary.fields:
+                                st.subheader("📋 字段信息")
+                                fields_data = []
+                                for field in summary.fields:
+                                    fields_data.append({
+                                        "字段名": field.column,
+                                        "数据类型": field.dtype,
+                                        "描述": getattr(field, 'description', ''),
+                                    })
+                                
+                                fields_df = pd.DataFrame(fields_data)
+                                st.dataframe(fields_df, use_container_width=True)
+                            
+                            # 存储摘要
+                            st.session_state['summary'] = summary
+                            st.session_state['data_str'] = data_str
+                        else:
+                            st.error("❌ 未能生成数据摘要")
+                    else:
+                        st.error("❌ 无法连接到LLM服务")
+                        
+                except Exception as e:
+                    st.error(f"❌ 数据摘要生成失败: {e}")
     else:
-        st.info("请先在'数据上传'标签页中上传数据文件")
+        st.info("请先在"数据上传"标签页上传CSV文件")
 
 with tab3:
-    st.header("📈 数据可视化")
+    st.header("📈 智能可视化")
     
     if 'summary' in st.session_state:
-        # 可视化目标输入
-        goal = st.text_area(
-            "📝 描述你想要的可视化",
-            placeholder="例如: 显示各个类别的销售额分布",
-            help="用自然语言描述你想要创建的图表"
+        # 可视化描述输入
+        viz_description = st.text_area(
+            "描述您想要的可视化",
+            placeholder="例如：显示各类别的销售额分布的柱状图",
+            help="用自然语言描述您想要生成的图表类型和内容"
         )
         
-        if st.button("🎨 生成可视化", type="primary") and goal:
-            try:
-                with st.spinner("正在生成可视化..."):
-                    # 获取LIDA管理器
-                    lida = get_lida_manager()
+        if st.button("🎯 生成可视化", type="primary") and viz_description:
+            with st.spinner("正在生成可视化..."):
+                try:
+                    lida_manager = get_lida_manager()
                     
-                    # 生成可视化
-                    charts = lida.visualize(
-                        summary=st.session_state.summary,
-                        goal=goal,
-                        library="matplotlib"
-                    )
-                    
-                    if charts:
-                        st.success(f"✅ 生成了 {len(charts)} 个可视化方案！")
+                    if lida_manager:
+                        # 生成可视化方案
+                        goals = lida_manager.goals(st.session_state['summary'], n=3)
                         
-                        # 显示图表
-                        for i, chart in enumerate(charts):
-                            st.subheader(f"📊 方案 {i+1}")
+                        if goals:
+                            st.success("✅ 可视化方案生成成功")
                             
-                            # 显示代码
-                            with st.expander("查看生成的代码"):
-                                st.code(chart.code, language="python")
-                            
-                            # 执行并显示图表
-                            try:
-                                exec(chart.code)
-                                st.pyplot()
-                            except Exception as exec_e:
-                                st.error(f"图表执行失败: {exec_e}")
+                            # 显示生成的目标
+                            st.subheader("🎯 推荐的可视化方案")
+                            for i, goal in enumerate(goals):
+                                with st.expander(f"方案 {i+1}: {goal.question}", expanded=(i==0)):
+                                    st.write(f"**可视化类型**: {goal.visualization}")
+                                    st.write(f"**基本原理**: {goal.rationale}")
+                        else:
+                            st.warning("未能生成可视化方案，请尝试调整描述")
                     else:
-                        st.warning("未能生成可视化方案，请尝试调整描述")
+                        st.error("❌ 无法连接到LLM服务")
                         
-            except Exception as e:
-                st.error(f"❌ 可视化生成失败: {e}")
+                except Exception as e:
+                    st.error(f"❌ 可视化生成失败: {e}")
     else:
         st.info("请先生成数据摘要")
 
 # 页脚
 st.markdown("---")
 st.markdown(
-    """
+    '''
     <div style='text-align: center; color: #666;'>
         <p>🤖 由 LIDA + 自定义LLM 驱动 | 📊 智能数据可视化助手</p>
     </div>
-    """,
+    ''',
     unsafe_allow_html=True
 )
-'''
+"""
     
-    try:
-        with open('lida_app.py', 'w', encoding='utf-8') as f:
-            f.write(app_content)
-        print("✅ Streamlit应用文件创建成功: lida_app.py")
-        return True
-    except Exception as e:
-        print(f"❌ 创建Streamlit应用失败: {e}")
-        return False
+    # 写入临时应用文件
+    with open('temp_lida_app.py', 'w', encoding='utf-8') as f:
+        f.write(app_content)
+    
+    print("✅ Streamlit应用文件创建成功")
 
 if __name__ == "__main__":
-    print("🚀 LIDA Web界面启动器")
-    print("=" * 30)
-    
-    # 检查依赖
-    try:
-        import streamlit
-        print("✅ Streamlit已安装")
-    except ImportError:
-        print("❌ 需要安装Streamlit")
-        print("运行: python3 -m pip install streamlit")
-        sys.exit(1)
-    
-    # 启动Web界面
     start_lida_web()

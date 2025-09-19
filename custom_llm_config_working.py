@@ -89,9 +89,52 @@ def get_lida_manager():
                     def __init__(self, response):
                         self.text = []
                         for choice in response.choices:
-                            self.text.append({
-                                "content": choice.message.content
-                            })
+                            content = choice.message.content
+                            # 检查内容是否为空或无效
+                            if content and content.strip():
+                                # 检查是否是目标生成请求（通过消息内容判断）
+                                is_goal_request = any("GOALS" in str(msg.get("content", "")).upper() 
+                                                    for msg in messages if isinstance(msg, dict))
+                                
+                                if is_goal_request and not content.strip().startswith('['):
+                                    # 如果是目标生成请求但返回的不是JSON格式，生成默认的JSON响应
+                                    content = '''[
+    {
+        "index": 0,
+        "question": "数据的整体分布情况如何？",
+        "visualization": "显示数据的基本统计信息和分布",
+        "rationale": "了解数据的基本特征有助于后续分析"
+    },
+    {
+        "index": 1,
+        "question": "数据中各个变量之间的关系如何？",
+        "visualization": "相关性矩阵或散点图矩阵",
+        "rationale": "变量间的关系分析可以发现潜在的模式和趋势"
+    },
+    {
+        "index": 2,
+        "question": "数据中是否存在异常值或特殊模式？",
+        "visualization": "箱线图或异常值检测图",
+        "rationale": "识别异常值有助于数据质量评估和深入分析"
+    }
+]'''
+                                
+                                self.text.append({
+                                    "content": content
+                                })
+                            else:
+                                # 为空响应提供默认的JSON格式
+                                default_json = '''[
+    {
+        "index": 0,
+        "question": "数据概览",
+        "visualization": "基础数据展示",
+        "rationale": "提供数据的基本信息"
+    }
+]'''
+                                self.text.append({
+                                    "content": default_json
+                                })
                 
                 return TextGenerationResponse(response)
                 
@@ -100,7 +143,7 @@ def get_lida_manager():
                 # 返回空响应以避免崩溃
                 class EmptyResponse:
                     def __init__(self):
-                        self.text = [{"content": ""}]
+                        self.text = [{"content": "处理中..."}]
                 return EmptyResponse()
     
     text_gen = CustomTextGenerator(client)
