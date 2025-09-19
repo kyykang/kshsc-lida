@@ -55,10 +55,20 @@ selected_tab_index = st.session_state.get('selected_tab', 0)
 tab_names = ["📁 数据上传", "📊 数据摘要", "🎯 目标生成", "📈 数据可视化", "✏️ 图表编辑", "🎨 智能推荐"]
 
 # 使用radio来模拟标签页切换
+# 如果session_state中已经有tab_selector的值，使用它；否则使用索引
+if "tab_selector" in st.session_state:
+    # 确保session_state中的值在tab_names中
+    if st.session_state.tab_selector in tab_names:
+        default_index = tab_names.index(st.session_state.tab_selector)
+    else:
+        default_index = selected_tab_index
+else:
+    default_index = selected_tab_index
+
 selected_tab_name = st.radio(
     "选择功能页面",
     tab_names,
-    index=selected_tab_index,
+    index=default_index,
     horizontal=True,
     key="tab_selector"
 )
@@ -357,8 +367,8 @@ elif selected_tab_name == "📈 数据可视化":
                                     image_data = base64.b64decode(chart.raster)
                                     image = Image.open(BytesIO(image_data))
                                     
-                                    # 使用唯一的key来避免缓存问题
-                                    st.image(image, caption=f"方案 {i+1}", use_column_width=True, key=f"chart_{i}_{hash(chart.code)}")
+                                    # 显示图表图片
+                                    st.image(image, caption=f"方案 {i+1}", use_container_width=True)
                                 elif chart.error:
                                     # 显示错误信息
                                     st.error(f"图表生成失败: {chart.error.get('message', '未知错误')}")
@@ -406,7 +416,7 @@ elif selected_tab_name == "✏️ 图表编辑":
                 
                 image_data = base64.b64decode(current_chart.raster)
                 image = Image.open(BytesIO(image_data))
-                st.image(image, caption="当前图表", use_column_width=True, key=f"edit_chart_{hash(current_chart.code)}")
+                st.image(image, caption="当前图表", use_container_width=True)
         except Exception as e:
             st.error(f"图表显示失败: {e}")
         
